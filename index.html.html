@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Birlik Bayrağı - Sınıf Etkinliği</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { margin: 0; background: #1a1a2e; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+        .container { text-align: center; padding: 20px; width: 100%; max-width: 900px; }
+        .ui { margin-bottom: 20px; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; display: flex; gap: 10px; justify-content: center; backdrop-filter: blur(5px); }
+        input { padding: 12px; border-radius: 8px; border: 2px solid #e30a17; width: 250px; font-size: 16px; outline: none; }
+        button { padding: 12px 25px; background: #e30a17; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        button:active { transform: scale(0.95); }
+        canvas { background: #e30a17; border-radius: 15px; box-shadow: 0 0 40px rgba(0,0,0,0.5); max-width: 100%; }
+        .status { margin-top: 10px; font-size: 0.8rem; color: #888; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Sizin paylaştığınız güncel yapılandırma
+        const firebaseConfig = {
+            apiKey: "AIzaSyDd_i5_rcv8pFox73rPglBQiietl_mmPqY",
+            authDomain: "sinifbayrak.firebaseapp.com",
+            databaseURL: "https://sinifbayrak-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "Sinifbayrak",
+            storageBucket: "sinifbayrak.firebasestorage.app",
+            messagingSenderId: "1521048040",
+            appId: "1:1521048040:web:8d60795d22cee2f9062c5d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        // React'in erişebilmesi için global'e taşıyoruz
+        window.F_DB = db;
+        window.F_REF = ref;
+        window.F_PUSH = push;
+        window.F_ONVALUE = onValue;
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const App = () => {
+            const [name, setName] = useState('');
+            const [names, setNames] = useState([]);
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (window.F_DB) {
+                        const namesRef = window.F_REF(window.F_DB, 'names');
+                        window.F_ONVALUE(namesRef, (snapshot) => {
+                            const data = snapshot.val();
+                            if (data) setNames(Object.values(data));
+                        });
+                        clearInterval(interval);
+                    }
+                }, 500);
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const [w, h] = [canvas.width, canvas.height];
+                
+                ctx.fillStyle = '#e30a17';
+                ctx.fillRect(0, 0, w, h);
+
+                ctx.save();
+                ctx.beginPath();
+                // Hilal Formu
+                ctx.arc(w * 0.36, h * 0.5, h * 0.28, 0, 7); 
+                ctx.moveTo(w * 0.44, h * 0.5);
+                ctx.arc(w * 0.44, h * 0.5, h * 0.22, 0, 7, true); 
+                // Yıldız Formu
+                const sx = w * 0.63, sy = h * 0.5, out = h * 0.12, inn = h * 0.05;
+                for(let i=0; i<5; i++) {
+                    ctx.lineTo(sx + Math.cos((18+i*72)*Math.PI/180)*out, sy - Math.sin((18+i*72)*Math.PI/180)*out);
+                    ctx.lineTo(sx + Math.cos((54+i*72)*Math.PI/180)*inn, sy - Math.sin((54+i*72)*Math.PI/180)*inn);
+                }
+                ctx.closePath();
+                ctx.clip();
+
+                names.forEach(n => {
+                    ctx.fillStyle = 'white';
+                    ctx.font = `bold ${n.size}px Arial`;
+                    ctx.fillText(n.text, n.x, n.y);
+                });
+                ctx.restore();
+            }, [names]);
+
+            const handleAdd = (e) => {
+                e.preventDefault();
+                if(!name.trim() || !window.F_DB) return;
+                
+                const namesRef = window.F_REF(window.F_DB, 'names');
+                window.F_PUSH(namesRef, {
+                    text: name.toUpperCase(),
+                    x: 180 + Math.random() * 400,
+                    y: 120 + Math.random() * 260,
+                    size: 14 + Math.random() * 8
+                });
+                setName('');
+            };
+
+            return (
+                <div className="container">
+                    <h1>BİRLİK BAYRAĞI</h1>
+                    <form className="ui" onSubmit={handleAdd}>
+                        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ad Soyad..." maxLength="20" />
+                        <button type="submit">Bayrağa Ekle</button>
+                    </form>
+                    <canvas ref={canvasRef} width="800" height="500" />
+                    <div className="status">Toplam Katılım: {names.length}</div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
